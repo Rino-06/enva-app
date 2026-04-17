@@ -7,6 +7,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Bağlantı testi
 supabase.from('athletes').select('*').then(({ data, error }) => {
-  if (error) console.error('Supabase bağlantı hatası:', error)
-  else console.log('Supabase bağlantısı başarılı! Veri:', data)
+  if (error) console.error('Supabase hatası:', error.message)
+  else console.log('Bağlantı başarılı! Sporcu sayısı:', data.length)
 })
