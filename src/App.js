@@ -62,7 +62,7 @@ const savedSession = (() => {
 //  Renk sabitleri (diğer sayfalarda da kullanılır)
 // ─────────────────────────────────────────────
 const AGE_COLORS = { U9: DARK_C.green, U11: DARK_C.blue, U13: DARK_C.yg, U15: DARK_C.gold };
-const PALETTE    = ["#5DC46A","#3B90D5","#A8D240","#F0C040","#FF7043","#C084FC","#FF8C57","#4DD9AC"];
+const PALETTE    = ["#4FC3F7","#81C784","#FFB74D","#F06292","#CE93D8","#80CBC4","#FFD54F","#FF8A65"];
 
 // ─────────────────────────────────────────────
 //  Ortak stil fabrikası  (S nesnesini üretir)
@@ -89,6 +89,67 @@ export const makeStyles = (colors) => ({
     background: `${color}25`, color, letterSpacing: "0.04em",
   }),
 });
+
+// ─────────────────────────────────────────────
+//  TimeRow  —  Süre giriş satırı (ENVAApp dışında
+//  tanımlı — içeride olursa her render'da yeni tip
+//  oluşur, input unmount/remount = mobil klavye kapanır)
+// ─────────────────────────────────────────────
+function TimeRow({ C, S, disc, min, setMin, sec, setSec, ms, setMs, accent }) {
+  const fields = [
+    { v: min, fn: setMin, l: "DAK", mx: 59 },
+    ":",
+    { v: sec, fn: setSec, l: "SN",  mx: 59 },
+    ...(disc === "swim" ? [".", { v: ms, fn: setMs, l: "SALİSE", mx: 99 }] : []),
+  ];
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+      {fields.map((f, i) =>
+        typeof f === "string"
+          ? <span key={i} style={{ color: C.muted, fontSize: 24, paddingTop: 10, fontWeight: 300, flexShrink: 0 }}>{f}</span>
+          : <div key={i} style={{ flex: 1, textAlign: "center" }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={f.v}
+                onChange={e => f.fn(e.target.value)}
+                placeholder="00"
+                style={{
+                  ...S.inp,
+                  padding: "10px 2px", fontSize: 24, fontWeight: 900,
+                  textAlign: "center", border: `2px solid ${accent}44`,
+                }}
+              />
+              <div style={{ color: C.muted, fontSize: 9, marginTop: 3, letterSpacing: "0.07em" }}>{f.l}</div>
+            </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  GenderIcon  —  SVG erkek/kız simgesi
+// ─────────────────────────────────────────────
+function GenderIcon({ gender, color, size = "100%", bg }) {
+  const isMale = gender === "E";
+  return (
+    <div style={{
+      width: size, height: size,
+      background: bg || `${color}22`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      borderRadius: "inherit",
+    }}>
+      <svg viewBox="0 0 24 24" fill={color} width="58%" height="58%" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="7" r="4"/>
+        {isMale
+          ? <path d="M6 21v-2a6 6 0 0112 0v2H6z"/>
+          : <path d="M12 13c-3 0-5.5 1.5-6.5 4L4 21h16l-1.5-4C17.5 14.5 15 13 12 13z"/>
+        }
+      </svg>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────
 //  ENVAApp  —  Ana bileşen
@@ -252,9 +313,10 @@ export default function ENVAApp() {
     setTimeout(() => setTSaved(false), 2000);
   };
 
-  const getBest = (studentId, discipline, src) => {
+  const getBest = (studentId, discipline, src, ym = null) => {
     const arr = (src === "comp" ? comps : trainings)
-      .filter(p => p.studentId === studentId && p.discipline === discipline);
+      .filter(p => p.studentId === studentId && p.discipline === discipline
+        && (!ym || p.date.startsWith(ym)));
     if (!arr.length) return null;
     return arr.reduce((b, p) =>
       toSec(p.minutes, p.seconds, p.milliseconds || 0) <
@@ -262,38 +324,23 @@ export default function ENVAApp() {
     );
   };
 
-  // ── Reusable bileşen: TimeRow ─────────────────
-  const TimeRow = ({ disc, min, setMin, sec, setSec, ms, setMs, accent }) => (
-    <div style={{ display:"flex", alignItems:"flex-start", gap:5 }}>
-      {[
-        { v:min, fn:setMin, l:"DAK", mx:59 },
-        ":",
-        { v:sec, fn:setSec, l:"SN", mx:59 },
-        ...(disc === "swim" ? [".", { v:ms, fn:setMs, l:"SALİSE", mx:99 }] : []),
-      ].map((f, i) =>
-        typeof f === "string"
-          ? <span key={i} style={{ color:C.muted, fontSize:24, paddingTop:10, fontWeight:300, flexShrink:0 }}>{f}</span>
-          : <div key={i} style={{ flex:1, textAlign:"center" }}>
-              <input
-                type="number" min={0} max={f.mx} value={f.v}
-                onChange={e => f.fn(e.target.value)} placeholder="00"
-                style={{ ...S.inp, padding:"10px 2px", fontSize:24, fontWeight:900,
-                  textAlign:"center", border:`2px solid ${accent}44` }}
-              />
-              <div style={{ color:C.muted, fontSize:9, marginTop:3, letterSpacing:"0.07em" }}>{f.l}</div>
-            </div>
-      )}
-    </div>
-  );
-
   // ── Navigasyon tanımı ─────────────────────────
-  const NAV = [
-    { id:"dash",     e:"🏠", l:"Ana" },
-    { id:"entry",    e:"⏱️", l:"Antrenman" },
-    { id:"athletes", e:"👥", l:"Sporcular" },
-    { id:"reports",  e:"📊", l:"Analiz" },
-    { id:"settings", e:"⚙️", l:"Ayarlar" },
+  // SVG icon paths for nav
+  const NAV_ICONS = {
+    dash:     <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>,
+    entry:    <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>,
+    athletes: <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>,
+    reports:  <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>,
+    settings: <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>,
+  };
+  const NAV_ALL = [
+    { id:"dash",     l:"Ana",       coachOnly: false },
+    { id:"entry",    l:"Antrenman", coachOnly: true  },
+    { id:"athletes", l:"Sporcular", coachOnly: false },
+    { id:"reports",  l:"Analiz",    coachOnly: true  },
+    { id:"settings", l:"Ayarlar",   coachOnly: true  },
   ];
+  const NAV = NAV_ALL.filter(n => isCoach || !n.coachOnly);
 
   // ─────────────────────────────────────────────
   //  LOGIN SAYFASI
@@ -303,7 +350,7 @@ export default function ENVAApp() {
       minHeight:"100vh", display:"flex", flexDirection:"column",
       alignItems:"center", justifyContent:"center",
       padding:"24px 20px", fontFamily:"'Nunito',sans-serif",
-      background:"linear-gradient(155deg, #0a2e1f 0%, #0d3d2e 25%, #0a2840 55%, #071e38 100%)",
+      background:"linear-gradient(155deg, #070d1a 0%, #0d1628 25%, #101e38 55%, #070d1a 100%)",
       position:"relative", overflow:"hidden",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet"/>
@@ -419,15 +466,14 @@ export default function ENVAApp() {
     comps, setComps,
     calendar, setCalendar,
     // türetilmiş
-    authUser, isCoach, visibleStudents,
+    authUser, setAuthUser, isCoach, visibleStudents,
+    isSuperUser: !!authUser?.superUser,
     // navigasyon
     setPage,
     // logout
     doLogin, saveTraining, getBest,
     // yardımcılar
     C, S, COMP_TYPES, fmtTime, fmtDate, makePassword, toSec, todayStr, pad, AGE_COLORS, PALETTE,
-    // reusable bileşenler
-    TimeRow,
     // antrenman state
     tSt, setTSt, tDisc, setTDisc, tDate, setTDate,
     tMin, setTMin, tSec, setTSec, tMs, setTMs, tSaved,
@@ -472,7 +518,7 @@ export default function ENVAApp() {
   return (
     <div style={{
       background: darkMode
-        ? "linear-gradient(155deg, #0a2e1f 0%, #0d3d2e 25%, #0a2840 55%, #071e38 100%)"
+        ? "linear-gradient(155deg, #070d1a 0%, #0d1628 25%, #101e38 55%, #070d1a 100%)"
         : "linear-gradient(155deg, #e8f4ff 0%, #d6eaff 30%, #e0f0ff 60%, #cce3ff 100%)",
       minHeight:"100vh",
       fontFamily:"'Nunito',sans-serif",
@@ -552,12 +598,12 @@ export default function ENVAApp() {
       }}>
         {NAV.map(item => (
           <button key={item.id} onClick={() => setPage(item.id)} style={{
-            flex:1, padding:"7px 0 9px", background:"none", border:"none", cursor:"pointer",
-            display:"flex", flexDirection:"column", alignItems:"center", gap:2,
+            flex:1, padding:"8px 0 10px", background:"none", border:"none", cursor:"pointer",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:3,
             fontFamily:"inherit", position:"relative",
           }}>
-            <span style={{ fontSize:16, filter: page === item.id ? "none" : "grayscale(1) opacity(.4)" }}>
-              {item.e}
+            <span style={{ color: page === item.id ? C.green : C.muted, display:"flex", lineHeight:1 }}>
+              {NAV_ICONS[item.id]}
             </span>
             <span style={{
               fontSize:9, fontWeight:900, letterSpacing:"0.04em",
@@ -727,6 +773,9 @@ function PageDash(props) {
   } = props;
   const [expandedAge,    setExpandedAge]    = React.useState(null);
   const [selectedStudent,setSelectedStudent]= React.useState(null);
+  const [detailTab,      setDetailTab]      = React.useState("swim");
+  const [detailYm,       setDetailYm]       = React.useState("ALL");
+  const [detailChart,    setDetailChart]    = React.useState("line");
   const todayD = new Date().toISOString().slice(0,10);
 
   const thisMonth = new Date(); thisMonth.setDate(1); thisMonth.setHours(0,0,0,0);
@@ -764,72 +813,181 @@ function PageDash(props) {
 
   if(selectedStudent){
     const s=selectedStudent;
-    const bSw=getBest(s.id,"swim","training"); const bRn=getBest(s.id,"run","training");
-    const bSwC=getBest(s.id,"swim","comp");    const bRnC=getBest(s.id,"run","comp");
-    const myTrainings=[...trainings].filter(t=>t.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
-    const myComps=[...comps].filter(c=>c.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
     const ac=ageColors2[s.ageGroup]||C.green;
+    const myTrainings=[...trainings].filter(t=>t.studentId===s.id).sort((a,b)=>a.date.localeCompare(b.date));
+    const myComps=[...comps].filter(c=>c.studentId===s.id).sort((a,b)=>a.date.localeCompare(b.date));
+
+    // year filter for chart
+    const allDetailYears = [...new Set([...myTrainings,...myComps].map(p=>p.date.slice(0,4)))].sort().reverse();
+    const ymPfx = detailYm === "ALL" ? null : detailYm;
+
+    // chart data per tab
+    const swimTrainData = myTrainings.filter(t=>t.discipline==="swim" && (!ymPfx||t.date.startsWith(ymPfx)))
+      .map(t=>({ d:t.date.slice(5), v:toSec(t.minutes,t.seconds,t.milliseconds||0), raw:t }));
+    const runTrainData  = myTrainings.filter(t=>t.discipline==="run" && (!ymPfx||t.date.startsWith(ymPfx)))
+      .map(t=>({ d:t.date.slice(5), v:toSec(t.minutes,t.seconds,0), raw:t }));
+    const compSwimData  = myComps.filter(c=>c.discipline==="swim" && (!ymPfx||c.date.startsWith(ymPfx)))
+      .map(c=>({ d:c.date.slice(5), v:toSec(c.minutes,c.seconds,c.milliseconds||0), raw:c }));
+    const compRunData   = myComps.filter(c=>c.discipline==="run" && (!ymPfx||c.date.startsWith(ymPfx)))
+      .map(c=>({ d:c.date.slice(5), v:toSec(c.minutes,c.seconds,0), raw:c }));
+
+    const chartData = detailTab==="swim" ? swimTrainData
+                    : detailTab==="run"  ? runTrainData
+                    : detailTab==="compswim" ? compSwimData
+                    : compRunData;
+    const chartColor = (detailTab==="swim"||detailTab==="compswim") ? C.blue : C.green;
+    const isComp = detailTab==="compswim"||detailTab==="comprun";
+
+    const bSw  = getBest(s.id,"swim","training");
+    const bRn  = getBest(s.id,"run","training");
+    const bSwC = getBest(s.id,"swim","comp");
+    const bRnC = getBest(s.id,"run","comp");
+
+    const TABS=[
+      {id:"swim",    label:"🏊 Ant.Yüzme"},
+      {id:"run",     label:"🏃 Ant.Koşu"},
+      {id:"compswim",label:"🏅 Yar.Yüzme"},
+      {id:"comprun", label:"🏅 Yar.Koşu"},
+    ];
+
     return (
       <div style={{padding:"0 14px 14px"}}>
+        {/* back */}
         <button onClick={()=>setSelectedStudent(null)} style={{
           display:"flex",alignItems:"center",gap:6,background:"none",border:"none",
           cursor:"pointer",color:C.muted,fontFamily:"inherit",fontWeight:800,fontSize:13,marginBottom:14,padding:0,
         }}>← Ana Sayfa</button>
+
+        {/* athlete header */}
         <div style={{background:C.card,borderRadius:14,padding:14,marginBottom:12,border:`1px solid ${C.border}`}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:52,height:52,borderRadius:14,background:s.gender==="E"?`${C.blue}22`:`${C.green}22`,
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>
-              {s.gender==="E"?"👦":"👧"}
+            <div style={{width:52,height:52,borderRadius:14,overflow:"hidden"}}>
+              <GenderIcon gender={s.gender} color={s.gender==="E"?C.blue:C.green}/>
             </div>
             <div>
               <div style={{color:C.text,fontSize:16,fontWeight:900}}>{s.name}</div>
-              <div style={{display:"flex",gap:6,marginTop:4}}>
+              <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{...S.chip(ac),fontSize:10}}>{s.ageGroup}</span>
                 <span style={{...S.chip(C.muted),background:C.surface,fontSize:10}}>{s.birthYear||"?"}</span>
                 <span style={{...S.chip(s.gender==="E"?C.blue:C.green),fontSize:10}}>{s.gender==="E"?"Erkek":"Kız"}</span>
+                <span style={{...S.chip(C.muted),background:C.surface,fontSize:10}}>{s.club||""}</span>
               </div>
             </div>
           </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+
+        {/* best times row */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7,marginBottom:14}}>
           {[
-            {l:"Ant. En İyi 🏊",v:bSw?fmtTime("swim",bSw.minutes,bSw.seconds,bSw.milliseconds||0):"—",c:C.blue},
-            {l:"Ant. En İyi 🏃",v:bRn?fmtTime("run",bRn.minutes,bRn.seconds):"—",c:C.green},
-            {l:"Yar. En İyi 🏊",v:bSwC?fmtTime("swim",bSwC.minutes,bSwC.seconds,bSwC.milliseconds||0):"—",c:C.gold},
-            {l:"Yar. En İyi 🏃",v:bRnC?fmtTime("run",bRnC.minutes,bRnC.seconds):"—",c:C.gold},
+            {l:"Ant. En İyi\nYüzme", v:bSw?fmtTime("swim",bSw.minutes,bSw.seconds,bSw.milliseconds||0):"—", c:C.blue},
+            {l:"Ant. En İyi\nKoşu",  v:bRn?fmtTime("run",bRn.minutes,bRn.seconds):"—",                      c:C.green},
+            {l:"Yar. En İyi\nYüzme", v:bSwC?fmtTime("swim",bSwC.minutes,bSwC.seconds,bSwC.milliseconds||0):"—", c:C.gold},
+            {l:"Yar. En İyi\nKoşu",  v:bRnC?fmtTime("run",bRnC.minutes,bRnC.seconds):"—",                   c:C.gold},
           ].map(x=>(
-            <div key={x.l} style={{background:C.card,borderRadius:11,padding:"11px 10px",border:`1px solid ${C.border}`,textAlign:"center"}}>
-              <div style={{color:C.muted,fontSize:10,marginBottom:4}}>{x.l}</div>
-              <div style={{color:x.c,fontSize:15,fontWeight:900}}>{x.v}</div>
+            <div key={x.l} style={{background:C.card,borderRadius:11,padding:"10px 6px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{color:C.muted,fontSize:9,marginBottom:4,whiteSpace:"pre-line",lineHeight:1.3}}>{x.l}</div>
+              <div style={{color:x.c,fontSize:13,fontWeight:900}}>{x.v}</div>
             </div>
           ))}
         </div>
+
+        {/* discipline tabs */}
+        <div style={{display:"flex",gap:5,marginBottom:10,overflowX:"auto",paddingBottom:2}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setDetailTab(t.id)} style={{
+              padding:"7px 11px",borderRadius:9,border:"none",cursor:"pointer",
+              fontFamily:"inherit",fontWeight:800,fontSize:11,whiteSpace:"nowrap",
+              background: detailTab===t.id ? chartColor : C.surface,
+              color: detailTab===t.id ? "#fff" : C.muted,
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* chart */}
         <div style={{background:C.card,borderRadius:12,padding:13,marginBottom:12,border:`1px solid ${C.border}`}}>
-          <p style={{color:C.muted,fontSize:10,fontWeight:800,letterSpacing:"0.08em",margin:"0 0 8px"}}>SON ANTRENMANLAR ({myTrainings.length})</p>
-          {myTrainings.length===0&&<p style={{color:C.muted,fontSize:12,margin:0}}>Kayıt yok.</p>}
-          {myTrainings.slice(0,6).map(t=>(
-            <div key={t.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${C.border}`}}>
-              <span style={{color:C.muted,fontSize:12}}>{fmtDate(t.date)} {t.discipline==="swim"?"🏊":"🏃"}</span>
-              <span style={{color:t.discipline==="swim"?C.blue:C.green,fontWeight:800,fontSize:12}}>
-                {fmtTime(t.discipline,t.minutes,t.seconds,t.milliseconds||0)}
-              </span>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:6}}>
+            <p style={{color:C.muted,fontSize:9,fontWeight:800,letterSpacing:"0.08em",margin:0}}>
+              GELİŞİM GRAFİĞİ ({chartData.length} kayıt)
+            </p>
+            <div style={{display:"flex",gap:5,alignItems:"center"}}>
+              {[["line","📈"],["bar","📊"]].map(([t,l])=>(
+                <button key={t} onClick={()=>setDetailChart(t)} style={{
+                  padding:"3px 8px",borderRadius:6,border:"none",cursor:"pointer",
+                  fontFamily:"inherit",fontSize:12,fontWeight:800,
+                  background:detailChart===t?chartColor:C.surface,
+                  color:detailChart===t?"#fff":C.muted,
+                }}>{l}</button>
+              ))}
+              <select value={detailYm} onChange={e=>setDetailYm(e.target.value)}
+                style={{...S.inp,width:"auto",padding:"4px 8px",fontSize:11,borderRadius:7}}>
+                <option value="ALL">Tüm Yıllar</option>
+                {allDetailYears.map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
             </div>
-          ))}
+          </div>
+          {chartData.length < 2
+            ? <p style={{color:C.muted,fontSize:12,margin:0,textAlign:"center",padding:"20px 0"}}>Yeterli veri yok.</p>
+            : <ResponsiveContainer width="100%" height={160}>
+                {detailChart==="bar"
+                  ? <BarChart data={chartData} margin={{top:4,right:8,left:0,bottom:0}}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={C.border}/>
+                      <XAxis dataKey="d" tick={{fill:C.muted,fontSize:9}} tickLine={false} axisLine={false}/>
+                      <YAxis domain={['auto','auto']} tick={{fill:C.muted,fontSize:9}} tickLine={false} axisLine={false}
+                        tickFormatter={v=>{const m=Math.floor(v/60);const ss=Math.round(v%60);return`${m}:${ss<10?"0"+ss:ss}`;}} width={34}/>
+                      <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,color:C.text}}
+                        labelStyle={{color:C.muted,fontSize:10}} itemStyle={{color:chartColor,fontWeight:800}}
+                        formatter={(v,_,{payload})=>{const r=payload?.raw;if(!r)return v;
+                          return (detailTab==="swim"||detailTab==="compswim")
+                            ?[fmtTime("swim",r.minutes,r.seconds,r.milliseconds||0),"Süre"]
+                            :[fmtTime("run",r.minutes,r.seconds),"Süre"];}}/>
+                      <Bar dataKey="v" fill={chartColor} radius={[4,4,0,0]} opacity={0.85}/>
+                    </BarChart>
+                  : <LineChart data={chartData} margin={{top:4,right:8,left:0,bottom:0}}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={C.border}/>
+                      <XAxis dataKey="d" tick={{fill:C.muted,fontSize:9}} tickLine={false} axisLine={false}/>
+                      <YAxis domain={['auto','auto']} tick={{fill:C.muted,fontSize:9}} tickLine={false} axisLine={false}
+                        tickFormatter={v=>{const m=Math.floor(v/60);const ss=Math.round(v%60);return`${m}:${ss<10?"0"+ss:ss}`;}} width={34}/>
+                      <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,color:C.text}}
+                        labelStyle={{color:C.muted,fontSize:10}} itemStyle={{color:chartColor,fontWeight:800}}
+                        formatter={(v,_,{payload})=>{const r=payload?.raw;if(!r)return v;
+                          return (detailTab==="swim"||detailTab==="compswim")
+                            ?[fmtTime("swim",r.minutes,r.seconds,r.milliseconds||0),"Süre"]
+                            :[fmtTime("run",r.minutes,r.seconds),"Süre"];}}/>
+                      <Line type="monotone" dataKey="v" stroke={chartColor} strokeWidth={2.5}
+                        dot={{r:4,fill:chartColor,strokeWidth:0}} activeDot={{r:6,fill:chartColor,strokeWidth:0}}/>
+                    </LineChart>
+                }
+              </ResponsiveContainer>
+          }
         </div>
+
+        {/* records list */}
         <div style={{background:C.card,borderRadius:12,padding:13,border:`1px solid ${C.border}`}}>
-          <p style={{color:C.muted,fontSize:10,fontWeight:800,letterSpacing:"0.08em",margin:"0 0 8px"}}>SON YARIŞMALAR ({myComps.length})</p>
-          {myComps.length===0&&<p style={{color:C.muted,fontSize:12,margin:0}}>Kayıt yok.</p>}
-          {myComps.slice(0,4).map(c=>(
-            <div key={c.id} style={{padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <span style={{color:C.gold,fontSize:12,fontWeight:700}}>{c.name}</span>
-                <span style={{color:c.discipline==="swim"?C.blue:C.green,fontWeight:800,fontSize:12}}>
-                  {fmtTime(c.discipline,c.minutes,c.seconds,c.milliseconds||0)}
+          <p style={{color:C.muted,fontSize:9,fontWeight:800,letterSpacing:"0.08em",margin:"0 0 8px"}}>
+            {isComp?"YARIŞMA SONUÇLARI":"ANTRENMAN KAYITLARI"} ({chartData.length})
+          </p>
+          {chartData.length===0&&<p style={{color:C.muted,fontSize:12,margin:0}}>Kayıt yok.</p>}
+          {[...chartData].reverse().slice(0,8).map((item,i)=>{
+            const r=item.raw;
+            const isSwimDisc=detailTab==="swim"||detailTab==="compswim";
+            return (
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"6px 0",borderBottom:i<Math.min(chartData.length,8)-1?`1px solid ${C.border}`:"none"}}>
+                {isComp
+                  ? <div>
+                      <div style={{color:C.text,fontSize:12,fontWeight:700}}>{r.name}</div>
+                      <div style={{color:C.muted,fontSize:10}}>📍{r.location} · {fmtDate(r.date)}</div>
+                    </div>
+                  : <span style={{color:C.muted,fontSize:12}}>{fmtDate(r.date)}</span>
+                }
+                <span style={{color:chartColor,fontWeight:900,fontSize:13}}>
+                  {isSwimDisc
+                    ? fmtTime("swim",r.minutes,r.seconds,r.milliseconds||0)
+                    : fmtTime("run",r.minutes,r.seconds)}
                 </span>
               </div>
-              <div style={{color:C.muted,fontSize:10}}>📍{c.location} · {fmtDate(c.date)}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -927,10 +1085,13 @@ function PageDash(props) {
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:10}}>
         <div style={{background:C.card,borderRadius:12,padding:"10px 12px",border:`1px solid ${C.border}`}}>
           <p style={{color:C.muted,fontSize:9,fontWeight:800,letterSpacing:"0.08em",margin:"0 0 8px"}}>CİNSİYET DAĞILIMI</p>
-          {[{label:"👦 Erkek",count:maleCount,color:C.blue},{label:"👧 Kız",count:femaleCount,color:C.green}].map(({label,count,color})=>(
+          {[{label:"Erkek",gender:"E",count:maleCount,color:C.blue},{label:"Kız",gender:"K",count:femaleCount,color:C.green}].map(({label,gender,count,color})=>(
             <div key={label} style={{marginBottom:5}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                <span style={{color,fontSize:11,fontWeight:800}}>{label}</span>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                <span style={{color,fontSize:11,fontWeight:800,display:"flex",alignItems:"center",gap:4}}>
+                  <svg viewBox="0 0 24 24" fill={color} width="13" height="13"><circle cx="12" cy="7" r="4"/>{gender==="E"?<path d="M6 21v-2a6 6 0 0112 0v2H6z"/>:<path d="M12 13c-3 0-5.5 1.5-6.5 4L4 21h16l-1.5-4C17.5 14.5 15 13 12 13z"/>}</svg>
+                  {label}
+                </span>
                 <span style={{color:C.muted,fontSize:10}}>{count}</span>
               </div>
               <div style={{background:C.surface,borderRadius:3,height:5}}>
@@ -987,7 +1148,7 @@ function PageDash(props) {
                             padding:"7px 14px",cursor:"pointer",
                             borderBottom:si<groupStudents.length-1?`1px solid ${c}22`:"none"}}>
                           <div style={{display:"flex",alignItems:"center",gap:7}}>
-                            <span style={{fontSize:13}}>{s.gender==="E"?"👦":"👧"}</span>
+                            <div style={{width:22,height:22,borderRadius:6,overflow:"hidden",flexShrink:0}}><GenderIcon gender={s.gender} color={s.gender==="E"?C.blue:C.green}/></div>
                             <span style={{color:C.text,fontSize:12,fontWeight:700}}>{s.name}</span>
                             <span style={{color:C.muted,fontSize:10}}>{s.birthYear||""}</span>
                           </div>
@@ -1060,7 +1221,7 @@ function PageDash(props) {
 // ── PageEntry inline ──────────────────────────────────────────────────────
 function PageEntryView(props) {
   const {tDisc,setTDisc,tSt,setTSt,tDate,setTDate,tMin,setTMin,tSec,setTSec,
-    tMs,setTMs,tSaved,saveTraining,visibleStudents,trainings,setTrainings,fmtTime,fmtDate,C,S,TimeRow}=props;
+    tMs,setTMs,tSaved,saveTraining,visibleStudents,trainings,setTrainings,fmtTime,fmtDate,C,S}=props;
   const [editId, setEditId] = React.useState(null);
   const [editMin,setEditMin]=React.useState("");
   const [editSec,setEditSec]=React.useState("");
@@ -1097,7 +1258,7 @@ function PageEntryView(props) {
       </div>
       <span style={S.lbl}>{tDisc==="swim"?"SÜRE (DAK:SN.SALİSE)":"SÜRE (DAK:SN)"}</span>
       <div style={{marginBottom:13}}>
-        <TimeRow disc={tDisc} min={tMin} setMin={setTMin} sec={tSec} setSec={setTSec}
+        <TimeRow C={C} S={S} disc={tDisc} min={tMin} setMin={setTMin} sec={tSec} setSec={setTSec}
           ms={tMs} setMs={setTMs} accent={C.blue}/>
       </div>
       <button onClick={saveTraining} disabled={!tSt||!tMin||!tSec} style={{
@@ -1163,18 +1324,22 @@ function PageAthletes(props) {
   const [gendFilter,setGendFilter]=React.useState("ALL");
   const [nameFilter,setNameFilter]=React.useState("");
   const [compFilter,setCompFilter]=React.useState("ALL");
+  const [ymYear,setYmYear]=React.useState("ALL");
+  const [ymMonth,setYmMonth]=React.useState("ALL");
 
   // item 7: yarışma isim/konum listesi
   const compOptions=[...new Set(comps.map(c=>c.name+"||"+c.location))].sort();
+  const allYears=[...new Set([...trainings,...comps].map(p=>p.date.slice(0,4)))].sort().reverse();
+  const TR_MONTHS=["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+  const ymFilter = ymYear==="ALL" ? null
+    : ymMonth==="ALL" ? ymYear
+    : `${ymYear}-${String(+ymMonth).padStart(2,"0")}`;
 
 
   const toggleSort=(field)=>{if(sSort===field){setSSortDir(d=>({...d,[field]:d[field]==="asc"?"desc":"asc"}));}else{setSSort(field);}};
   const dir=sSortDir[sSort]==="asc"?1:-1;
 
-  // item 8: belirgin cinsiyet ikonu
-  const gIcon=(gender)=>gender==="E"
-    ?<div style={{width:"100%",height:"100%",background:`${C.blue}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:900,color:C.blue,borderRadius:8}}>♂</div>
-    :<div style={{width:"100%",height:"100%",background:`${C.green}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:900,color:C.green,borderRadius:8}}>♀</div>;
+  const gIcon=(gender)=><GenderIcon gender={gender} color={gender==="E"?C.blue:C.green}/>;
 
   const filtered=visibleStudents
     .filter(s=>{
@@ -1185,8 +1350,8 @@ function PageAthletes(props) {
       return true;
     })
     .map(s=>({...s,
-      _sw:getBest(s.id,"swim",dataFilter==="comp"?"comp":"training"),
-      _rn:getBest(s.id,"run",dataFilter==="comp"?"comp":"training"),
+      _sw:getBest(s.id,"swim",dataFilter==="comp"?"comp":"training",ymFilter),
+      _rn:getBest(s.id,"run",dataFilter==="comp"?"comp":"training",ymFilter),
     }))
     .sort((a,b)=>{
       if(sSort==="swim"){const as=a._sw?toSec(a._sw.minutes,a._sw.seconds,a._sw.milliseconds||0):9999;const bs=b._sw?toSec(b._sw.minutes,b._sw.seconds,b._sw.milliseconds||0):9999;return(as-bs)*dir;}
@@ -1313,7 +1478,7 @@ function PageAthletes(props) {
                 <CartesianGrid strokeDasharray="3 3" stroke={C.surface}/>
                 <XAxis dataKey="date" tick={{fill:C.muted,fontSize:8}}/>
                 <YAxis tick={{fill:C.muted,fontSize:8}} domain={["auto","auto"]} width={28}/>
-                <Tooltip contentStyle={{background:C.bg||C.surface,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10}}
+                <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10,color:C.text}}
                   formatter={(v,key,{payload})=>key==="sw"?[payload.sl,"🏊 Yüzme"]:key==="rn"?[payload.rl,"🏃 Koşu"]:[v,key]}/>
                 {swRecs.length>1&&<Line type="monotone" dataKey="sw" stroke={C.blue} strokeWidth={2.5} dot={{r:3,strokeWidth:0}} activeDot={{r:5}} connectNulls={false}/>}
                 {rnRecs.length>1&&<Line type="monotone" dataKey="rn" stroke={C.green} strokeWidth={2.5} dot={{r:3,strokeWidth:0}} activeDot={{r:5}} connectNulls={false}/>}
@@ -1379,6 +1544,18 @@ function PageAthletes(props) {
     <div style={{padding:"0 14px 14px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <h2 style={{color:C.text,fontSize:18,fontWeight:900,margin:0}}>Sporcular <span style={{color:C.muted,fontSize:13}}>({filtered.length})</span></h2>
+      </div>
+
+      {/* yıl-ay filtresi */}
+      <div style={{display:"flex",gap:6,marginBottom:6}}>
+        <select value={ymYear} onChange={e=>{setYmYear(e.target.value);setYmMonth("ALL");}} style={{...S.inp,flex:1,padding:"8px 10px",fontSize:12}}>
+          <option value="ALL">Tüm Yıllar</option>
+          {allYears.map(y=><option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={ymMonth} onChange={e=>setYmMonth(e.target.value)} disabled={ymYear==="ALL"} style={{...S.inp,flex:1,padding:"8px 10px",fontSize:12,opacity:ymYear==="ALL"?0.4:1}}>
+          <option value="ALL">Tüm Aylar</option>
+          {TR_MONTHS.map((m,i)=><option key={i+1} value={String(i+1)}>{m}</option>)}
+        </select>
       </div>
 
       {/* item 7: isim arama + yarışma filtresi */}
@@ -1469,20 +1646,28 @@ function PageReports(props) {
   } = props;
 
   // item 16: farklı renk paleti — daha belirgin
-  const PALETTE = ["#4ADE80","#60A5FA","#FBBF24","#F472B6","#A78BFA","#FB923C","#34D399","#38BDF8"];
+  const PALETTE = ["#4FC3F7","#81C784","#FFB74D","#F06292","#CE93D8","#80CBC4","#FFD54F","#FF8A65"];
 
   const [chartType,   setChartType]   = React.useState("line");
   const [rGrpAge,     setRGrpAge]     = React.useState("ALL");
   const [activeStuds, setActiveStuds] = React.useState(null);
-  // item 14: kaynak birleştirme — "both" seçeneği
-  const [rSrcMode, setRSrcMode] = React.useState("training"); // "training"|"comp"|"both"
+  const [rSrcMode,    setRSrcMode]    = React.useState("training");
+  const [rYmYear,     setRYmYear]     = React.useState("ALL");
+  const [rYmMonth,    setRYmMonth]    = React.useState("ALL");
+
+  const rAllYears=[...new Set([...trainings,...comps].map(p=>p.date.slice(0,4)))].sort().reverse();
+  const R_TR_MONTHS=["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+  const rYmFilter = rYmYear==="ALL" ? null
+    : rYmMonth==="ALL" ? rYmYear
+    : `${rYmYear}-${String(+rYmMonth).padStart(2,"0")}`;
 
   // Bireysel veri — item 14: hem antrenman hem yarışma gösterebilir
   const buildSrcData = (mode) =>
     (mode === "both"
       ? [...trainings.map(p=>({...p,_type:"t"})), ...comps.map(p=>({...p,_type:"c"}))]
       : mode === "comp" ? comps.map(p=>({...p,_type:"c"})) : trainings.map(p=>({...p,_type:"t"}))
-    ).filter(p => p.studentId === +rSt && p.discipline === rDisc);
+    ).filter(p => p.studentId === +rSt && p.discipline === rDisc
+      && (!rYmFilter || p.date.startsWith(rYmFilter)));
 
   const srcData = buildSrcData(rSrcMode);
   const cd = [...srcData]
@@ -1510,9 +1695,12 @@ function PageReports(props) {
     ? grpStudents.filter(s => activeStuds.includes(s.id))
     : grpStudents;
 
-  const grpSource = rSrcMode === "comp" ? comps
+  const grpSourceRaw = rSrcMode === "comp" ? comps
     : rSrcMode === "both" ? [...trainings, ...comps]
     : trainings;
+  const grpSource = rYmFilter
+    ? grpSourceRaw.filter(p => p.date.startsWith(rYmFilter))
+    : grpSourceRaw;
 
   const allDates = [...new Set(
     grpSource.filter(p => displayStuds.some(s=>s.id===p.studentId) && p.discipline===rDisc)
@@ -1581,6 +1769,18 @@ function PageReports(props) {
       {/* item 14: kaynak seçici (antrenman / yarışma / her ikisi) */}
       <SrcTabs/>
 
+      {/* yıl-ay filtresi */}
+      <div style={{display:"flex",gap:6,marginBottom:10}}>
+        <select value={rYmYear} onChange={e=>{setRYmYear(e.target.value);setRYmMonth("ALL");}} style={{...S.inp,flex:1,padding:"8px 10px",fontSize:12}}>
+          <option value="ALL">Tüm Yıllar</option>
+          {rAllYears.map(y=><option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={rYmMonth} onChange={e=>setRYmMonth(e.target.value)} disabled={rYmYear==="ALL"} style={{...S.inp,flex:1,padding:"8px 10px",fontSize:12,opacity:rYmYear==="ALL"?0.4:1}}>
+          <option value="ALL">Tüm Aylar</option>
+          {R_TR_MONTHS.map((m,i)=><option key={i+1} value={String(i+1)}>{m}</option>)}
+        </select>
+      </div>
+
       {/* Branş */}
       <div style={{display:"flex",gap:6,marginBottom:11}}>
         {[["swim","🏊 Yüzme"],["run","🏃 Koşu"]].map(([d,l])=>(
@@ -1613,7 +1813,7 @@ function PageReports(props) {
                 <XAxis dataKey="date" tick={{fill:C.muted,fontSize:10}}/>
                 <YAxis tick={{fill:C.muted,fontSize:10}} domain={["auto","auto"]} width={34}/>
                 <Tooltip
-                  contentStyle={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:11}}
+                  contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:11,color:C.text}}
                   labelStyle={{color:C.text,fontWeight:800}}
                   formatter={(v,n,{payload})=>[payload.label, payload._type==="c"?"🏅 Yarışma":"⏱️ Antrenman"]}/>
                 <Line type="monotone" dataKey="süre" stroke={lc} strokeWidth={3}
@@ -1703,7 +1903,7 @@ function PageReports(props) {
         {/* item 18: genişletilmiş grafik seçenekleri */}
         <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}>
           <span style={{color:C.muted,fontSize:9,fontWeight:800,letterSpacing:"0.07em",alignSelf:"center",marginRight:2}}>GRAFİK:</span>
-          {[["line","📈 Çizgi"],["bar","📊 Sütun"],["area","🏔️ Alan"],["scatter","⚡ En İyi"]].map(([t,l])=>(
+          {[["line","📈 Çizgi"],["bar","📊 Sütun"],["scatter","⚡ En İyi"]].map(([t,l])=>(
             <button key={t} onClick={()=>setChartType(t)} style={{
               padding:"5px 10px",borderRadius:7,border:`1px solid ${chartType===t?C.green:C.border}`,
               cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:800,
@@ -1750,27 +1950,12 @@ function PageReports(props) {
                   <XAxis dataKey="date" tick={{fill:C.muted,fontSize:9}}/>
                   <YAxis tick={{fill:C.muted,fontSize:9}} domain={["auto","auto"]} width={34}/>
                   <Tooltip
-                    contentStyle={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10}}
+                    contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10,color:C.text}}
                     formatter={(v,key,{payload})=>{const sid=+key.replace("s","");const st=displayStuds.find(s=>s.id===sid);return[payload[`l${sid}`]||`${v}s`,st?.name||key];}}/>
                   {displayStuds.map((s,i)=>(
                     <Line key={s.id} type="monotone" dataKey={`s${s.id}`}
                       stroke={PALETTE[grpStudents.findIndex(x=>x.id===s.id)%PALETTE.length]}
                       strokeWidth={2.5} dot={{r:4,strokeWidth:0}} activeDot={{r:6}} connectNulls={false}/>
-                  ))}
-                </LineChart>
-              ):chartType==="area"?(
-                <LineChart data={grpChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.surface}/>
-                  <XAxis dataKey="date" tick={{fill:C.muted,fontSize:9}}/>
-                  <YAxis tick={{fill:C.muted,fontSize:9}} domain={["auto","auto"]} width={34}/>
-                  <Tooltip
-                    contentStyle={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10}}
-                    formatter={(v,key,{payload})=>{const sid=+key.replace("s","");const st=displayStuds.find(s=>s.id===sid);return[payload[`l${sid}`]||`${v}s`,st?.name||key];}}/>
-                  {displayStuds.map((s,i)=>(
-                    <Line key={s.id} type="monotone" dataKey={`s${s.id}`}
-                      stroke={PALETTE[grpStudents.findIndex(x=>x.id===s.id)%PALETTE.length]}
-                      strokeWidth={2} dot={false} activeDot={{r:5}} connectNulls={false}
-                      fill={`${PALETTE[grpStudents.findIndex(x=>x.id===s.id)%PALETTE.length]}22`}/>
                   ))}
                 </LineChart>
               ):chartType==="bar"?(
@@ -1779,7 +1964,7 @@ function PageReports(props) {
                   <XAxis dataKey="date" tick={{fill:C.muted,fontSize:9}}/>
                   <YAxis tick={{fill:C.muted,fontSize:9}} domain={["auto","auto"]} width={34}/>
                   <Tooltip
-                    contentStyle={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10}}
+                    contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10,color:C.text}}
                     formatter={(v,key,{payload})=>{const sid=+key.replace("s","");const st=displayStuds.find(s=>s.id===sid);return[payload[`l${sid}`]||`${v}s`,st?.name||key];}}/>
                   {displayStuds.map((s,i)=>(
                     <Bar key={s.id} dataKey={`s${s.id}`}
@@ -1797,7 +1982,7 @@ function PageReports(props) {
                   <XAxis dataKey="name" tick={{fill:C.muted,fontSize:9}}/>
                   <YAxis tick={{fill:C.muted,fontSize:9}} domain={["auto","auto"]} width={34}/>
                   <Tooltip
-                    contentStyle={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10}}
+                    contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:10,color:C.text}}
                     formatter={(v,n,{payload})=>[payload.full,"En İyi"]}/>
                   <Bar dataKey="val" radius={[4,4,0,0]}>
                     {sortedBest.filter(x=>x.bst).map(({s},i)=>(

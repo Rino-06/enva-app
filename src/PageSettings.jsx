@@ -24,7 +24,7 @@ export default function PageSettings({
   comps,    setComps,
   calendar, setCalendar,
   authUser, setAuthUser,
-  isCoach,
+  isCoach,  isSuperUser,
   setPage,
   C, S,
 }) {
@@ -38,15 +38,21 @@ export default function PageSettings({
   });
   const [showAddS, setShowAddS] = useState(false);
 
+  // ── Sporcu düzenleme ─────────────────────────
+  const [editStudentId,   setEditStudentId]   = useState(null);
+  const [editStudentData, setEditStudentData] = useState({});
+
   // ── Antrenör ekleme ──────────────────────────
   const [newCoach, setNewCoach] = useState({ name:"", username:"", password:"" });
   const [showAddC, setShowAddC] = useState(false);
   const [editCoachId, setEditCoachId] = useState(null);
   const [editCoachData, setEditCoachData] = useState({});
 
-  // ── Veli ekleme ──────────────────────────────
+  // ── Veli ekleme + düzenleme ───────────────────
   const [newParent, setNewParent] = useState({ name:"", username:"", password:"", linkedStudentIds:[] });
   const [showAddP, setShowAddP] = useState(false);
+  const [editParentId,   setEditParentId]   = useState(null);
+  const [editParentData, setEditParentData] = useState({});
 
   // ── Takvim filtresi ──────────────────────────
   const [calFilter,    setCalFilter]    = useState({ cat:"", type:"", month:"", year:"" });
@@ -347,20 +353,52 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                   padding:"9px 13px 6px", margin:0, borderBottom:`1px solid ${C.border}`,
                 }}>{club}</p>
                 {clubStudents.map((s, i) => (
-                  <div key={s.id} style={{
-                    display:"flex", alignItems:"center", padding:"8px 13px",
-                    borderTop: i > 0 ? `1px solid ${C.border}` : "none",
-                  }}>
-                    <span style={{ fontSize:14, marginRight:8 }}>{s.gender === "E" ? "♂" : "♀"}</span>
-                    <div style={{ flex:1 }}>
-                      <div style={{ color:C.text, fontSize:12, fontWeight:800 }}>{s.name}</div>
-                      <div style={{ color:C.muted, fontSize:10 }}>{s.ageGroup} · {s.birthYear}</div>
-                    </div>
-                    <span style={{
-                      ...S.chip(s.ageGroup==="U9"?C.green:s.ageGroup==="U11"?C.blue:s.ageGroup==="U13"?C.yg:C.gold),
-                      fontSize:9, marginRight:8,
-                    }}>{s.ageGroup}</span>
-                    {/* item 19: Ayarlar'da sporcu silme YOK — silme işlemi Sporcular sayfasından yapılır */}
+                  <div key={s.id} style={{ borderTop: i > 0 ? `1px solid ${C.border}` : "none" }}>
+                    {editStudentId === s.id ? (
+                      <div style={{ padding:"10px 13px" }}>
+                        {[["İsim","name","text"],["Doğum Yılı","birthYear","number"]].map(([lbl,f,t])=>(
+                          <div key={f} style={{marginBottom:6}}>
+                            <span style={S.lbl}>{lbl}</span>
+                            <input type={t} value={editStudentData[f]||""} onChange={e=>setEditStudentData(p=>({...p,[f]:t==="number"?+e.target.value:e.target.value}))} style={S.inp}/>
+                          </div>
+                        ))}
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+                          <div>
+                            <span style={S.lbl}>CİNSİYET</span>
+                            <select value={editStudentData.gender||s.gender} onChange={e=>setEditStudentData(p=>({...p,gender:e.target.value}))} style={S.inp}>
+                              <option value="E">Erkek</option><option value="K">Kız</option>
+                            </select>
+                          </div>
+                          <div>
+                            <span style={S.lbl}>YAŞ GRUBU</span>
+                            <select value={editStudentData.ageGroup||s.ageGroup} onChange={e=>setEditStudentData(p=>({...p,ageGroup:e.target.value}))} style={S.inp}>
+                              {["U9","U11","U13","U15","U17"].map(g=><option key={g}>{g}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{
+                            const upd={...s,...editStudentData};
+                            setStudents(p=>p.map(x=>x.id===s.id?upd:x));
+                            supabase.from('athletes').update(editStudentData).eq('id',s.id).then(({error})=>{if(error)console.warn('student update:',error.message);});
+                            setEditStudentId(null);
+                          }} style={{...S.btn(C.green),flex:1,padding:"7px",borderRadius:8,fontSize:12}}>✅ Kaydet</button>
+                          <button onClick={()=>setEditStudentId(null)} style={{...S.btn(C.surface),color:C.muted,flex:1,padding:"7px",borderRadius:8,fontSize:12}}>İptal</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display:"flex", alignItems:"center", padding:"8px 13px" }}>
+                        <span style={{ fontSize:14, marginRight:8 }}>{s.gender === "E" ? "♂" : "♀"}</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ color:C.text, fontSize:12, fontWeight:800 }}>{s.name}</div>
+                          <div style={{ color:C.muted, fontSize:10 }}>{s.ageGroup} · {s.birthYear}</div>
+                        </div>
+                        <div style={{display:"flex",gap:4}}>
+                          <button onClick={()=>{setEditStudentId(s.id);setEditStudentData({name:s.name,gender:s.gender,ageGroup:s.ageGroup,birthYear:s.birthYear});}} style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✏️</button>
+                          {isSuperUser && <button onClick={()=>{if(!window.confirm||window.confirm(`"${s.name}" silinsin mi?`)){setStudents(p=>p.filter(x=>x.id!==s.id));supabase.from('athletes').delete().eq('id',s.id).then(({error})=>{if(error)console.warn('student delete:',error.message);});}}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {clubStudents.length === 0 && (
@@ -379,9 +417,7 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
         <div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
             <span style={{ color:C.muted, fontSize:11 }}>{coaches.length} antrenör</span>
-            <button onClick={() => setShowAddC(!showAddC)} style={{
-              ...S.btn(C.blue), padding:"7px 14px", borderRadius:9, fontSize:12,
-            }}>+ Antrenör Ekle</button>
+            {isSuperUser && <button onClick={() => setShowAddC(!showAddC)} style={{ ...S.btn(C.blue), padding:"7px 14px", borderRadius:9, fontSize:12 }}>+ Antrenör Ekle</button>}
           </div>
 
           {showAddC && (
@@ -478,7 +514,7 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                 ) : (
                   <div style={{display:"flex",gap:5}}>
                     <button onClick={()=>{setEditCoachId(c.id);setEditCoachData({name:c.name,username:c.username});}} style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✏️</button>
-                    <button onClick={()=>{if(!window.confirm||window.confirm("Antrenör silinsin mi?")){setCoaches(p=>p.filter(x=>x.id!==c.id));supabase.from('coaches').delete().eq('id',c.id).then(({error})=>{ if(error) console.warn('coach delete:',error.message); });}}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>
+                    {isSuperUser && <button onClick={()=>{if(!window.confirm||window.confirm("Antrenör silinsin mi?")){setCoaches(p=>p.filter(x=>x.id!==c.id));supabase.from('coaches').delete().eq('id',c.id).then(({error})=>{ if(error) console.warn('coach delete:',error.message); });}}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>}
                   </div>
                 )
               )}
@@ -562,28 +598,48 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
             </p>
           )}
           {parents.map(p => (
-            <div key={p.id} style={{
-              display:"flex", alignItems:"center", background:C.card, borderRadius:11,
-              padding:"10px 13px", marginBottom:8, border:`1px solid ${C.border}`,
-            }}>
-              <div style={{
-                width:36, height:36, borderRadius:10, background:`${C.yg}22`,
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginRight:10,
-              }}>👨‍👧</div>
-              <div style={{ flex:1 }}>
-                <div style={{ color:C.text, fontSize:13, fontWeight:800 }}>{p.name}</div>
-                <div style={{ color:C.muted, fontSize:10 }}>
-                  {p.linkedStudentIds?.map(id => students.find(s => s.id === id)?.name)
-                    .filter(Boolean).join(", ") || "Sporcu bağlı değil"}
+            <div key={p.id} style={{ background:C.card, borderRadius:11, marginBottom:8, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+              {editParentId === p.id ? (
+                <div style={{ padding:"10px 13px" }}>
+                  {[["Ad Soyad","name","text"],["Kullanıcı Adı","username","text"],["Şifre","password","text"]].map(([lbl,f,t])=>(
+                    <div key={f} style={{marginBottom:6}}>
+                      <span style={S.lbl}>{lbl}</span>
+                      <input type={t} value={editParentData[f]||""} onChange={e=>setEditParentData(prev=>({...prev,[f]:e.target.value}))} style={S.inp}/>
+                    </div>
+                  ))}
+                  <div style={{marginBottom:8}}>
+                    <span style={S.lbl}>BAĞLI SPORCULAR</span>
+                    {students.map(s=>(
+                      <label key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",cursor:"pointer"}}>
+                        <input type="checkbox" checked={(editParentData.linkedStudentIds||[]).includes(s.id)}
+                          onChange={e=>setEditParentData(prev=>({...prev,linkedStudentIds:e.target.checked?[...(prev.linkedStudentIds||[]),s.id]:(prev.linkedStudentIds||[]).filter(x=>x!==s.id)}))}/>
+                        <span style={{color:C.text,fontSize:12}}>{s.name} ({s.ageGroup})</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>{
+                      const upd={...p,...editParentData};
+                      setParents(prev=>prev.map(x=>x.id===p.id?upd:x));
+                      supabase.from('parents').update(editParentData).eq('id',p.id).then(({error})=>{if(error)console.warn('parent update:',error.message);});
+                      setEditParentId(null);
+                    }} style={{...S.btn(C.green),flex:1,padding:"7px",borderRadius:8,fontSize:12}}>✅ Kaydet</button>
+                    <button onClick={()=>setEditParentId(null)} style={{...S.btn(C.surface),color:C.muted,flex:1,padding:"7px",borderRadius:8,fontSize:12}}>İptal</button>
+                  </div>
                 </div>
-              </div>
-              <button onClick={() => {
-                setParents(prev => prev.filter(x => x.id !== p.id));
-                supabase.from('parents').delete().eq('id',p.id).then(({error})=>{ if(error) console.warn('parent delete:',error.message); });
-              }} style={{
-                background:`${C.red}22`, color:C.red, border:"none", borderRadius:6,
-                padding:"4px 8px", fontSize:11, cursor:"pointer", fontWeight:800,
-              }}>✕</button>
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", padding:"10px 13px" }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:`${C.yg}22`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginRight:10 }}>👨‍👧</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:C.text, fontSize:13, fontWeight:800 }}>{p.name}</div>
+                    <div style={{ color:C.muted, fontSize:10 }}>@{p.username} · {p.linkedStudentIds?.map(id=>students.find(s=>s.id===id)?.name).filter(Boolean).join(", ")||"Sporcu bağlı değil"}</div>
+                  </div>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={()=>{setEditParentId(p.id);setEditParentData({name:p.name,username:p.username,password:p.password,linkedStudentIds:[...(p.linkedStudentIds||[])]});}} style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✏️</button>
+                    <button onClick={()=>{setParents(prev=>prev.filter(x=>x.id!==p.id));supabase.from('parents').delete().eq('id',p.id).then(({error})=>{if(error)console.warn('parent delete:',error.message);});}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

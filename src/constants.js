@@ -4,9 +4,9 @@
 
 // ── Renk paleti ──────────────────────────────
 export const C = {
-  bg:"#071510", surface:"#0C2018", card:"#112A1E", card2:"#163523",
-  border:"#1E4030", green:"#2E9B40", greenL:"#5DC46A", yg:"#A8D240",
-  blue:"#3B90D5", text:"#E8F5EE", muted:"#5F9070",
+  bg:"#070D1A", surface:"#0D1628", card:"#111F35", card2:"#162844",
+  border:"#1E3050", green:"#2E9B40", greenL:"#5DC46A", yg:"#A8D240",
+  blue:"#3B90D5", text:"#E4EEF8", muted:"#6080A8",
   red:"#E05555", gold:"#F0C040",
 };
 
@@ -27,7 +27,7 @@ export const COMP_TYPES = [
 
 // ── Başlangıç verileri ────────────────────────
 export const INIT_COACHES = [
-  {id:1, name:"Arap Metin Yıldız", username:"arap.metin", password:"Enva@2024", role:"coach"},
+  {id:1, name:"Arap Metin Yıldız", username:"arap.metin", password:"Enva@2024", role:"coach", superUser:true},
 ];
 
 export const INIT_PARENTS = [];

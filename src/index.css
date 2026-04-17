@@ -7,6 +7,30 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* recharts: no focus outline / selection box on click */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface {
+  outline: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.recharts-rectangle.recharts-tooltip-cursor {
+  display: none;
+}
+.recharts-sector:focus,
+.recharts-bar-rectangle:focus,
+.recharts-dot:focus,
+.recharts-active-dot:focus,
+.recharts-line-dot:focus {
+  outline: none;
+}
+
+/* remove grey hover rectangle behind bars */
+.recharts-bar-bg {
+  display: none;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
