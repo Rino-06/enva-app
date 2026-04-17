@@ -12,7 +12,8 @@
 //    PageAbout     →  inline (küçük bileşen)
 // ─────────────────────────────────────────────
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { supabase } from "./supabase.js";
 import {
   LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -167,6 +168,52 @@ export default function ENVAApp() {
   // ── Stil nesnesi ─────────────────────────────
   const S = makeStyles(C);
 
+  // ── Supabase: ilk yüklemede tüm verileri çek ─
+  useEffect(() => {
+    async function loadAll() {
+      const [
+        { data: cData,   error: cErr  },
+        { data: pData,   error: pErr  },
+        { data: sData,   error: sErr  },
+        { data: tData,   error: tErr  },
+        { data: xData,   error: xErr  },
+        { data: calData, error: calErr},
+      ] = await Promise.all([
+        supabase.from('coaches').select('*').order('id'),
+        supabase.from('parents').select('*').order('id'),
+        supabase.from('athletes').select('*').order('id'),
+        supabase.from('trainings').select('*').order('id'),
+        supabase.from('comps').select('*').order('id'),
+        supabase.from('calendar').select('*').order('startDate'),
+      ]);
+      // coaches — seed if empty
+      if (!cErr && cData !== null) {
+        if (!cData.length) { await supabase.from('coaches').insert(INIT_COACHES); setCoaches(INIT_COACHES); }
+        else setCoaches(cData);
+      }
+      // parents
+      if (!pErr && pData !== null) setParents(pData);
+      // athletes/students — seed if empty
+      if (!sErr && sData !== null) {
+        if (!sData.length) { await supabase.from('athletes').insert(INIT_STUDENTS); setStudents(INIT_STUDENTS); }
+        else setStudents(sData);
+      }
+      // trainings
+      if (!tErr && tData !== null) setTrainings(tData);
+      // comps — seed if empty
+      if (!xErr && xData !== null) {
+        if (!xData.length) { await supabase.from('comps').insert(INIT_COMPS); setComps(INIT_COMPS); }
+        else setComps(xData);
+      }
+      // calendar — seed if empty
+      if (!calErr && calData !== null) {
+        if (!calData.length) { await supabase.from('calendar').insert(INIT_CALENDAR); setCalendar(INIT_CALENDAR); }
+        else setCalendar(calData);
+      }
+    }
+    loadAll();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── İşlevler ─────────────────────────────────
   const doLogin = () => {
     const uInput = lUser.trim().toLowerCase();
@@ -191,11 +238,15 @@ export default function ENVAApp() {
 
   const saveTraining = () => {
     if (!tSt || !tMin || !tSec) return;
-    setTrainings(prev => [...prev, {
+    const entry = {
       id: Date.now(), studentId: +tSt, date: tDate, discipline: tDisc,
       minutes: +tMin || 0, seconds: +tSec || 0,
       milliseconds: tDisc === "swim" ? (+tMs || 0) : 0,
-    }]);
+    };
+    setTrainings(prev => [...prev, entry]);
+    supabase.from('trainings').insert(entry).then(({ error }) => {
+      if (error) console.warn('Training sync error:', error.message);
+    });
     setTMin(""); setTSec(""); setTMs("0");
     setTSaved(true);
     setTimeout(() => setTSaved(false), 2000);

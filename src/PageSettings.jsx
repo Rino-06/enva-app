@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────
 import { useState } from "react";
 import { makeUsername, makePassword, fmtDate } from "./utils.js";
+import { supabase } from "./supabase.js";
 
 export default function PageSettings({
   coaches,  setCoaches,
@@ -142,17 +143,15 @@ Tarih formatı: PDF'deki tarihi YYYY-MM-DD yap. Yüzme süresi mm:ss.ms formatı
             rank: row.rank || 0, totalParticipants: row.totalParticipants || 0, score: row.score || 0,
           };
           if (row.swimMin || row.swimSec) {
-            setComps(prev => [...prev, {
-              ...base, id: newId + 0.1, discipline: "swim",
-              minutes: row.swimMin, seconds: row.swimSec, milliseconds: row.swimMs,
-            }]);
+            const sw = { ...base, id: newId + 0.1, discipline: "swim", minutes: row.swimMin, seconds: row.swimSec, milliseconds: row.swimMs };
+            setComps(prev => [...prev, sw]);
+            supabase.from('comps').insert(sw).then(({error})=>{ if(error) console.warn('comp insert:',error.message); });
             added++;
           }
           if (row.runMin || row.runSec) {
-            setComps(prev => [...prev, {
-              ...base, id: newId + 0.2, discipline: "run",
-              minutes: row.runMin, seconds: row.runSec, milliseconds: row.runMs,
-            }]);
+            const rn = { ...base, id: newId + 0.2, discipline: "run", minutes: row.runMin, seconds: row.runSec, milliseconds: row.runMs };
+            setComps(prev => [...prev, rn]);
+            supabase.from('comps').insert(rn).then(({error})=>{ if(error) console.warn('comp insert:',error.message); });
             added++;
           }
         });
@@ -324,7 +323,9 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
               </div>
               <button onClick={() => {
                 if (!newStudent.name.trim()) return;
-                setStudents(p => [...p, { ...newStudent, id: Date.now() }]);
+                const ns = { ...newStudent, id: Date.now() };
+                setStudents(p => [...p, ns]);
+                supabase.from('athletes').insert(ns).then(({error})=>{ if(error) console.warn('athlete insert:',error.message); });
                 setNewStudent({ name:"", gender:"E", ageGroup:"U11", birthYear:2017, club:"ENVA ÇEVRE SPOR KULÜBÜ" });
                 setShowAddS(false);
               }} style={{
@@ -433,7 +434,9 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
               </div>
               <button onClick={() => {
                 if (!newCoach.name || !newCoach.username || !newCoach.password) return;
-                setCoaches(p => [...p, { ...newCoach, id: Date.now(), role:"coach" }]);
+                const nc = { ...newCoach, id: Date.now(), role:"coach" };
+                setCoaches(p => [...p, nc]);
+                supabase.from('coaches').insert(nc).then(({error})=>{ if(error) console.warn('coach insert:',error.message); });
                 setNewCoach({ name:"", username:"", password:"", photo:null });
                 setShowAddC(false);
               }} style={{
@@ -464,13 +467,18 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
               {c.id !== authUser.id && (
                 editCoachId === c.id ? (
                   <div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>{setCoaches(p=>p.map(x=>x.id===c.id?{...x,...editCoachData}:x));setEditCoachId(null);}} style={{background:`${C.green}22`,color:C.green,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✅</button>
+                    <button onClick={()=>{
+                      const upd={...c,...editCoachData};
+                      setCoaches(p=>p.map(x=>x.id===c.id?upd:x));
+                      supabase.from('coaches').update(editCoachData).eq('id',c.id).then(({error})=>{ if(error) console.warn('coach update:',error.message); });
+                      setEditCoachId(null);
+                    }} style={{background:`${C.green}22`,color:C.green,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✅</button>
                     <button onClick={()=>setEditCoachId(null)} style={{background:C.surface,color:C.muted,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>✕</button>
                   </div>
                 ) : (
                   <div style={{display:"flex",gap:5}}>
                     <button onClick={()=>{setEditCoachId(c.id);setEditCoachData({name:c.name,username:c.username});}} style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✏️</button>
-                    <button onClick={()=>{if(!window.confirm||window.confirm("Antrenör silinsin mi?"))setCoaches(p=>p.filter(x=>x.id!==c.id));}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>
+                    <button onClick={()=>{if(!window.confirm||window.confirm("Antrenör silinsin mi?")){setCoaches(p=>p.filter(x=>x.id!==c.id));supabase.from('coaches').delete().eq('id',c.id).then(({error})=>{ if(error) console.warn('coach delete:',error.message); });}}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>
                   </div>
                 )
               )}
@@ -536,7 +544,9 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
               </div>
               <button onClick={() => {
                 if (!newParent.name || !newParent.username) return;
-                setParents(p => [...p, { ...newParent, id: Date.now(), role:"parent" }]);
+                const np = { ...newParent, id: Date.now(), role:"parent" };
+                setParents(p => [...p, np]);
+                supabase.from('parents').insert(np).then(({error})=>{ if(error) console.warn('parent insert:',error.message); });
                 setNewParent({ name:"", username:"", password:"", linkedStudentIds:[] });
                 setShowAddP(false);
               }} style={{
@@ -567,7 +577,10 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                     .filter(Boolean).join(", ") || "Sporcu bağlı değil"}
                 </div>
               </div>
-              <button onClick={() => setParents(prev => prev.filter(x => x.id !== p.id))} style={{
+              <button onClick={() => {
+                setParents(prev => prev.filter(x => x.id !== p.id));
+                supabase.from('parents').delete().eq('id',p.id).then(({error})=>{ if(error) console.warn('parent delete:',error.message); });
+              }} style={{
                 background:`${C.red}22`, color:C.red, border:"none", borderRadius:6,
                 padding:"4px 8px", fontSize:11, cursor:"pointer", fontWeight:800,
               }}>✕</button>
@@ -661,7 +674,11 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                       type="date" style={{...S.inp,fontSize:12}}/>
                   </div>
                   <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>{setCalendar(p=>p.map(x=>x.id===ev.id?{...x,...editCalData}:x));setEditCalId(null);}}
+                    <button onClick={()=>{
+                      setCalendar(p=>p.map(x=>x.id===ev.id?{...x,...editCalData}:x));
+                      supabase.from('calendar').update(editCalData).eq('id',ev.id).then(({error})=>{ if(error) console.warn('cal update:',error.message); });
+                      setEditCalId(null);
+                    }}
                       style={{...S.btn(C.green),flex:1,padding:8,borderRadius:8,fontSize:12}}>✅ Kaydet</button>
                     <button onClick={()=>setEditCalId(null)}
                       style={{...S.btn(C.surface,C.muted),padding:8,borderRadius:8,fontSize:12}}>İptal</button>
@@ -686,7 +703,7 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                   <div style={{display:"flex",gap:5,flexShrink:0}}>
                     <button onClick={()=>{setEditCalId(ev.id);setEditCalData({name:ev.name,location:ev.location,startDate:ev.startDate,endDate:ev.endDate});}}
                       style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 7px",fontSize:10,cursor:"pointer",fontWeight:800}}>✏️</button>
-                    <button onClick={()=>{if(!window.confirm||window.confirm("Etkinlik silinsin mi?"))setCalendar(p=>p.filter(x=>x.id!==ev.id));}}
+                    <button onClick={()=>{if(!window.confirm||window.confirm("Etkinlik silinsin mi?")){setCalendar(p=>p.filter(x=>x.id!==ev.id));supabase.from('calendar').delete().eq('id',ev.id).then(({error})=>{ if(error) console.warn('cal delete:',error.message); });}}}
                       style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 7px",fontSize:10,cursor:"pointer",fontWeight:800}}>🗑️</button>
                   </div>
                 </div>
@@ -762,8 +779,11 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                       </div>
                       <div style={{display:"flex",gap:6}}>
                         <button onClick={()=>{
-                          setComps(p=>p.map(c=>c.name===name&&c.date===date&&c.location===loc
-                            ?{...c,name:editCompData.name,location:editCompData.location,date:editCompData.date}:c));
+                          const upd={name:editCompData.name,location:editCompData.location,date:editCompData.date};
+                          setComps(p=>p.map(c=>c.name===name&&c.date===date&&c.location===loc?{...c,...upd}:c));
+                          // update all matching rows in supabase
+                          supabase.from('comps').update(upd).eq('name',name).eq('date',date).eq('location',loc)
+                            .then(({error})=>{ if(error) console.warn('comp update:',error.message); });
                           setEditCompKey(null);
                         }} style={{...S.btn(C.green),flex:1,padding:8,borderRadius:8,fontSize:12}}>✅ Kaydet</button>
                         <button onClick={()=>setEditCompKey(null)}
@@ -778,7 +798,7 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
                       </div>
                       <button onClick={()=>{setEditCompKey(key);setEditCompData({name,location:loc,date});}}
                         style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 7px",fontSize:10,cursor:"pointer",fontWeight:800}}>✏️</button>
-                      <button onClick={()=>{if(!window.confirm||window.confirm(`"${name}" yarışmasının ${cnt} kaydı silinsin mi?`))setComps(p=>p.filter(c=>!(c.name===name&&c.date===date&&c.location===loc)));}} style={{
+                      <button onClick={()=>{if(!window.confirm||window.confirm(`"${name}" yarışmasının ${cnt} kaydı silinsin mi?`)){setComps(p=>p.filter(c=>!(c.name===name&&c.date===date&&c.location===loc)));supabase.from('comps').delete().eq('name',name).eq('date',date).eq('location',loc).then(({error})=>{ if(error) console.warn('comp delete:',error.message); });}}} style={{
                         background:`${C.red}22`, color:C.red, border:"none", borderRadius:6,
                         padding:"4px 8px", fontSize:11, cursor:"pointer", fontWeight:800,
                       }}>🗑️</button>
