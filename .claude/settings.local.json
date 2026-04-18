@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx react-scripts *)",
-      "Bash(curl -s http://localhost:3000)"
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(npm run *)"
     ]
   }
 }

@@ -1654,6 +1654,7 @@ function PageReports(props) {
   const [rSrcMode,    setRSrcMode]    = React.useState("training");
   const [rYmYear,     setRYmYear]     = React.useState("ALL");
   const [rYmMonth,    setRYmMonth]    = React.useState("ALL");
+  const [rLocFilter,  setRLocFilter]  = React.useState("ALL");
 
   const rAllYears=[...new Set([...trainings,...comps].map(p=>p.date.slice(0,4)))].sort().reverse();
   const R_TR_MONTHS=["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
@@ -1667,7 +1668,8 @@ function PageReports(props) {
       ? [...trainings.map(p=>({...p,_type:"t"})), ...comps.map(p=>({...p,_type:"c"}))]
       : mode === "comp" ? comps.map(p=>({...p,_type:"c"})) : trainings.map(p=>({...p,_type:"t"}))
     ).filter(p => p.studentId === +rSt && p.discipline === rDisc
-      && (!rYmFilter || p.date.startsWith(rYmFilter)));
+      && (!rYmFilter || p.date.startsWith(rYmFilter))
+      && (rLocFilter === "ALL" || !p.location || p.location === rLocFilter));
 
   const srcData = buildSrcData(rSrcMode);
   const cd = [...srcData]
@@ -1698,9 +1700,12 @@ function PageReports(props) {
   const grpSourceRaw = rSrcMode === "comp" ? comps
     : rSrcMode === "both" ? [...trainings, ...comps]
     : trainings;
-  const grpSource = rYmFilter
-    ? grpSourceRaw.filter(p => p.date.startsWith(rYmFilter))
-    : grpSourceRaw;
+  const grpSource = grpSourceRaw
+    .filter(p => !rYmFilter || p.date.startsWith(rYmFilter))
+    .filter(p => rLocFilter === "ALL" || !p.location || p.location === rLocFilter);
+
+  // unique competition locations for filter
+  const rLocOptions = [...new Set(comps.map(c => c.location).filter(Boolean))].sort();
 
   const allDates = [...new Set(
     grpSource.filter(p => displayStuds.some(s=>s.id===p.studentId) && p.discipline===rDisc)
@@ -1781,6 +1786,14 @@ function PageReports(props) {
         </select>
       </div>
 
+      {/* Yarışma konum filtresi — sadece yarışma kaynağında göster */}
+      {rSrcMode !== "training" && rLocOptions.length > 0 && (
+        <select value={rLocFilter} onChange={e=>setRLocFilter(e.target.value)} style={{...S.inp,marginBottom:10,fontSize:12}}>
+          <option value="ALL">📍 Tüm Lokasyonlar</option>
+          {rLocOptions.map(l=><option key={l} value={l}>{l}</option>)}
+        </select>
+      )}
+
       {/* Branş */}
       <div style={{display:"flex",gap:6,marginBottom:11}}>
         {[["swim","🏊 Yüzme"],["run","🏃 Koşu"]].map(([d,l])=>(
@@ -1815,7 +1828,12 @@ function PageReports(props) {
                 <Tooltip
                   contentStyle={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,fontFamily:"inherit",fontSize:11,color:C.text}}
                   labelStyle={{color:C.text,fontWeight:800}}
-                  formatter={(v,n,{payload})=>[payload.label, payload._type==="c"?"🏅 Yarışma":"⏱️ Antrenman"]}/>
+                  formatter={(v,n,{payload})=>[
+                    payload.label,
+                    payload._type==="c"
+                      ? `🏅 ${payload.nm||"Yarışma"}${payload.loc?` — 📍${payload.loc}`:""}`
+                      : "⏱️ Antrenman"
+                  ]}/>
                 <Line type="monotone" dataKey="süre" stroke={lc} strokeWidth={3}
                   dot={({cx,cy,payload})=>(
                     <circle key={cx} cx={cx} cy={cy} r={4}
@@ -1894,9 +1912,16 @@ function PageReports(props) {
           </div>
           <div style={{flex:1}}>
             <span style={{...S.lbl,fontSize:9}}>YAŞ GRUBU</span>
-            <select value={rGrpAge} onChange={e=>{setRGrpAge(e.target.value);setActiveStuds(null);}} style={S.inp}>
-              {["ALL","U9","U11","U13","U15","U17"].map(g=><option key={g} value={g}>{g==="ALL"?"Tümü":g}</option>)}
-            </select>
+            <div style={{display:"flex",background:C.card,borderRadius:8,padding:2}}>
+              {["ALL","U9","U11","U13","U15"].map(g=>(
+                <button key={g} onClick={()=>{setRGrpAge(g);setActiveStuds(null);}} style={{
+                  flex:1,padding:"6px 2px",borderRadius:6,border:"none",cursor:"pointer",
+                  fontFamily:"inherit",fontSize:9,fontWeight:800,
+                  background:rGrpAge===g?C.surface:"transparent",
+                  color:rGrpAge===g?C.text:C.muted,
+                }}>{g==="ALL"?"Tümü":g}</button>
+              ))}
+            </div>
           </div>
         </div>
 

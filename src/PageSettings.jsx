@@ -483,40 +483,39 @@ Sadece U9/U11/U13/U15/U17 kategorilerinden birini içerenleri ekle. Kategorileri
           )}
 
           {coaches.map((c, i) => (
-            <div key={c.id} style={{
-              display:"flex", alignItems:"center", background:C.card, borderRadius:11,
-              padding:"10px 13px", marginBottom:8, border:`1px solid ${C.border}`,
-            }}>
-              <div style={{
-                width:36, height:36, borderRadius:10, background:`${C.blue}22`,
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginRight:10,
-              }}>
-                {c.photo
-                  ? <img src={c.photo} style={{ width:36, height:36, borderRadius:10, objectFit:"cover" }} alt=""/>
-                  : "🎯"
-                }
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ color:C.text, fontSize:13, fontWeight:800 }}>{c.name}</div>
-                <div style={{ color:C.muted, fontSize:10 }}>@{c.username}</div>
-              </div>
-              {c.id !== authUser.id && (
-                editCoachId === c.id ? (
-                  <div style={{display:"flex",gap:5}}>
+            <div key={c.id} style={{ background:C.card, borderRadius:11, marginBottom:8, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+              {editCoachId === c.id ? (
+                <div style={{ padding:"10px 13px" }}>
+                  {[["Ad Soyad","name","text"],["Kullanıcı Adı","username","text"],["Şifre","password","text"]].map(([lbl,f,t])=>(
+                    <div key={f} style={{marginBottom:6}}>
+                      <span style={S.lbl}>{lbl}</span>
+                      <input type={t} value={editCoachData[f]||""} onChange={e=>setEditCoachData(p=>({...p,[f]:e.target.value}))} style={S.inp}/>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",gap:6}}>
                     <button onClick={()=>{
                       const upd={...c,...editCoachData};
                       setCoaches(p=>p.map(x=>x.id===c.id?upd:x));
                       supabase.from('coaches').update(editCoachData).eq('id',c.id).then(({error})=>{ if(error) console.warn('coach update:',error.message); });
                       setEditCoachId(null);
-                    }} style={{background:`${C.green}22`,color:C.green,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✅</button>
-                    <button onClick={()=>setEditCoachId(null)} style={{background:C.surface,color:C.muted,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>✕</button>
+                    }} style={{...S.btn(C.green),flex:1,padding:"7px",borderRadius:8,fontSize:12}}>✅ Kaydet</button>
+                    <button onClick={()=>setEditCoachId(null)} style={{...S.btn(C.surface),color:C.muted,flex:1,padding:"7px",borderRadius:8,fontSize:12}}>İptal</button>
                   </div>
-                ) : (
-                  <div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>{setEditCoachId(c.id);setEditCoachData({name:c.name,username:c.username});}} style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✏️</button>
-                    {isSuperUser && <button onClick={()=>{if(!window.confirm||window.confirm("Antrenör silinsin mi?")){setCoaches(p=>p.filter(x=>x.id!==c.id));supabase.from('coaches').delete().eq('id',c.id).then(({error})=>{ if(error) console.warn('coach delete:',error.message); });}}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>}
+                </div>
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", padding:"10px 13px" }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:`${C.blue}22`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginRight:10 }}>
+                    {c.photo ? <img src={c.photo} style={{ width:36, height:36, borderRadius:10, objectFit:"cover" }} alt=""/> : "🎯"}
                   </div>
-                )
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:C.text, fontSize:13, fontWeight:800 }}>{c.name}{c.superUser&&<span style={{color:C.gold,fontSize:9,marginLeft:5,fontWeight:800}}>★ Süper</span>}</div>
+                    <div style={{ color:C.muted, fontSize:10 }}>@{c.username}</div>
+                  </div>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={()=>{setEditCoachId(c.id);setEditCoachData({name:c.name,username:c.username,password:c.password||""});}} style={{background:`${C.blue}22`,color:C.blue,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>✏️</button>
+                    {isSuperUser && c.id !== authUser.id && <button onClick={()=>{if(!window.confirm||window.confirm("Antrenör silinsin mi?")){setCoaches(p=>p.filter(x=>x.id!==c.id));supabase.from('coaches').delete().eq('id',c.id).then(({error})=>{ if(error) console.warn('coach delete:',error.message); });}}} style={{background:`${C.red}22`,color:C.red,border:"none",borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:800}}>🗑️</button>}
+                  </div>
+                </div>
               )}
             </div>
           ))}
